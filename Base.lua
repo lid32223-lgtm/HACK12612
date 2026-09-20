@@ -1,100 +1,757 @@
--- Place this in StarterPlayerScripts or StarterGui as a LocalScript
-
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer or Players:GetPlayers()[1]
+local pg = player:WaitForChild("PlayerGui")
+local camera = workspace.CurrentCamera
 
--- Create ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CustomUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
+-- Remove existing panel if open
+if pg:FindFirstChild("AdminPanel") then pg.AdminPanel:Destroy() end
 
--- Create Main Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 300, 0, 350)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -175)
-mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Parent = screenGui
+local sg = Instance.new("ScreenGui")
+sg.Name = "AdminPanel"
+sg.ResetOnSpawn = false
+sg.Parent = pg
 
--- Round corners for main frame
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 10)
-mainCorner.Parent = mainFrame
+local frame = Instance.new("Frame")
+frame.Name = "AdminFrame"
+frame.Size = UDim2.new(0, 280, 0, 420)
+frame.Position = UDim2.new(0.5, -140, 0.5, -210)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = sg
 
--- Create Title Bar (for dragging)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(60, 60, 70)
+stroke.Thickness = 1
+
 local titleBar = Instance.new("Frame")
 titleBar.Name = "TitleBar"
-titleBar.Size = UDim2.new(1, 0, 0, 40)
-titleBar.Position = UDim2.new(0, 0, 0, 0)
-titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+titleBar.Size = UDim2.new(1, 0, 0, 36)
+titleBar.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
 titleBar.BorderSizePixel = 0
-titleBar.Parent = mainFrame
+titleBar.Parent = frame
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 10)
-titleCorner.Parent = titleBar
+local fix = Instance.new("Frame")
+fix.Size = UDim2.new(1, 0, 0, 10)
+fix.Position = UDim2.new(0, 0, 1, -10)
+fix.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+fix.BorderSizePixel = 0
+fix.Parent = titleBar
 
--- Fix bottom corners of title bar
-local titleFix = Instance.new("Frame")
-titleFix.Name = "CornerFix"
-titleFix.Size = UDim2.new(1, 0, 0, 10)
-titleFix.Position = UDim2.new(0, 0, 1, -10)
-titleFix.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-titleFix.BorderSizePixel = 0
-titleFix.Parent = titleBar
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -45, 1, 0)
+title.Position = UDim2.new(0, 12, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "⚙ Admin Panel"
+title.TextColor3 = Color3.fromRGB(220, 220, 230)
+title.TextSize = 15
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
 
--- Title Text
-local titleText = Instance.new("TextLabel")
-titleText.Name = "Title"
-titleText.Size = UDim2.new(1, -50, 1, 0)
-titleText.Position = UDim2.new(0, 15, 0, 0)
-titleText.BackgroundTransparency = 1
-titleText.Text = "My Custom UI"
-titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleText.TextSize = 18
-titleText.Font = Enum.Font.GothamBold
-titleText.TextXAlignment = Enum.TextXAlignment.Left
-titleText.Parent = titleBar
+local container = Instance.new("Frame")
+container.Size = UDim2.new(1, -20, 1, -46)
+container.Position = UDim2.new(0, 10, 0, 42)
+container.BackgroundTransparency = 1
+container.Parent = frame
+Instance.new("UIListLayout", container).Padding = UDim.new(0, 8)
 
--- Close Button
-local closeButton = Instance.new("TextButton")
-closeButton.Name = "CloseButton"
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -35, 0, 5)
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeButton.BorderSizePixel = 0
-closeButton.Text = "X"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextSize = 16
-closeButton.Font = Enum.Font.GothamBold
-closeButton.Parent = titleBar
+-- ========================
+-- ESP SYSTEM
+-- ========================
+local espEnabled = false
+local espConnections = {}
 
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 6)
-closeCorner.Parent = closeButton
+local function getTeamColor(targetPlayer)
+    if targetPlayer.Team and player.Team then
+        if targetPlayer.Team == player.Team then
+            return Color3.fromRGB(50, 255, 50)
+        else
+            return Color3.fromRGB(255, 50, 50)
+        end
+    end
+    return Color3.fromRGB(255, 255, 0)
+end
 
--- Button Container
-local buttonContainer = Instance.new("Frame")
-buttonContainer.Name = "ButtonContainer"
-buttonContainer.Size = UDim2.new(1, -30, 1, -60)
-buttonContainer.Position = UDim2.new(0, 15, 0, 50)
-buttonContainer.BackgroundTransparency = 1
-buttonContainer.Parent = mainFrame
+local function addESP(targetPlayer)
+    if targetPlayer == player then return end
 
--- Layout for buttons
-local listLayout = Instance.new("UIListLayout")
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Padding = UDim.new(0, 10)
-listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-listLayout.Parent = buttonContainer
+    local function applyHighlight(character)
+        if not espEnabled then return end
+        if not character then return end
 
--- Button colors
-local buttonColors = {
-    Color3.fromRGB(70, 130, 230),   -- Blue
-    Color3.fromRGB(70, 190, 100),   -- Green
-    Color3.fromRGB(230, 160, 50),   -- Orange
-    Color3.fromRGB(180, 70, 220),   
+        local old = character:FindFirstChild("AdminESP")
+        if old then old:Destroy() end
+
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "AdminESP"
+        highlight.Adornee = character
+        highlight.FillTransparency = 0.7
+        highlight.OutlineTransparency = 0
+        highlight.FillColor = getTeamColor(targetPlayer)
+        highlight.OutlineColor = getTeamColor(targetPlayer)
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = character
+
+        local head = character:FindFirstChild("Head")
+        if head then
+            local old2 = head:FindFirstChild("AdminESPTag")
+            if old2 then old2:Destroy() end
+
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "AdminESPTag"
+            billboard.Adornee = head
+            billboard.Size = UDim2.new(0, 200, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+            billboard.AlwaysOnTop = true
+            billboard.Parent = head
+
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = targetPlayer.Name
+            nameLabel.TextColor3 = getTeamColor(targetPlayer)
+            nameLabel.TextSize = 14
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.TextStrokeTransparency = 0.3
+            nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+            nameLabel.Parent = billboard
+
+            local distLabel = Instance.new("TextLabel")
+            distLabel.Name = "DistLabel"
+            distLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            distLabel.Position = UDim2.new(0, 0, 0.5, 0)
+            distLabel.BackgroundTransparency = 1
+            distLabel.Text = "0m"
+            distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            distLabel.TextSize = 12
+            distLabel.Font = Enum.Font.Gotham
+            distLabel.TextStrokeTransparency = 0.3
+            distLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+            distLabel.Parent = billboard
+        end
+    end
+
+    if targetPlayer.Character then
+        applyHighlight(targetPlayer.Character)
+    end
+
+    local conn = targetPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        applyHighlight(char)
+    end)
+    table.insert(espConnections, conn)
+end
+
+local function removeESP(targetPlayer)
+    if targetPlayer.Character then
+        local h = targetPlayer.Character:FindFirstChild("AdminESP")
+        if h then h:Destroy() end
+        local head = targetPlayer.Character:FindFirstChild("Head")
+        if head then
+            local tag = head:FindFirstChild("AdminESPTag")
+            if tag then tag:Destroy() end
+        end
+    end
+end
+
+local function enableESP()
+    espEnabled = true
+    for _, p in Players:GetPlayers() do
+        addESP(p)
+    end
+
+    local joinConn = Players.PlayerAdded:Connect(function(p)
+        if espEnabled then
+            task.wait(1)
+            addESP(p)
+        end
+    end)
+    table.insert(espConnections, joinConn)
+
+    local leaveConn = Players.PlayerRemoving:Connect(function(p)
+        removeESP(p)
+    end)
+    table.insert(espConnections, leaveConn)
+
+    local distConn
+    distConn = RunService.Heartbeat:Connect(function()
+        if not espEnabled then distConn:Disconnect() return end
+        local myChar = player.Character
+        if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+        local myPos = myChar.HumanoidRootPart.Position
+
+        for _, p in Players:GetPlayers() do
+            if p ~= player and p.Character then
+                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                local head = p.Character:FindFirstChild("Head")
+                if hrp and head then
+                    local tag = head:FindFirstChild("AdminESPTag")
+                    if tag then
+                        local distLabel = tag:FindFirstChild("DistLabel")
+                        if distLabel then
+                            local dist = math.floor((myPos - hrp.Position).Magnitude)
+                            distLabel.Text = dist .. "m"
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    table.insert(espConnections, distConn)
+end
+
+local function disableESP()
+    espEnabled = false
+    for _, p in Players:GetPlayers() do
+        removeESP(p)
+    end
+    for _, conn in espConnections do
+        if typeof(conn) == "RBXScriptConnection" then
+            conn:Disconnect()
+        end
+    end
+    espConnections = {}
+end
+
+-- ========================
+-- AIMLOCK SYSTEM
+-- ========================
+local aimlockHolding = false
+local aimlockConn = nil
+local targetLabel = nil
+
+local function getNearestPlayer()
+    local myChar = player.Character
+    if not myChar or not myChar:FindFirstChild("Head") then return nil end
+    local myPos = myChar.Head.Position
+
+    local nearest = nil
+    local nearestDist = math.huge
+
+    for _, p in Players:GetPlayers() do
+        if p ~= player and p.Character then
+            if player.Team and p.Team and p.Team == player.Team then
+                continue
+            end
+
+            local head = p.Character:FindFirstChild("Head")
+            local humanoid = p.Character:FindFirstChild("Humanoid")
+            if head and humanoid and humanoid.Health > 0 then
+                local dist = (myPos - head.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = p
+                end
+            end
+        end
+    end
+
+    return nearest
+end
+
+local function startAimlock()
+    if aimlockConn then return end
+
+    aimlockConn = RunService.RenderStepped:Connect(function()
+        if not aimlockHolding then return end
+
+        local target = getNearestPlayer()
+
+        if target and target.Character then
+            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local camPos = camera.CFrame.Position
+                local targetPos = hrp.Position
+                camera.CFrame = CFrame.new(camPos, targetPos)
+
+                local screenPos, onScreen = camera:WorldToScreenPoint(targetPos)
+                if onScreen then
+                    mousemoveabs(screenPos.X, screenPos.Y)
+                end
+
+                if targetLabel then
+                    targetLabel.Text = "🎯 Locked: " .. target.Name
+                end
+            end
+        else
+            if targetLabel then
+                targetLabel.Text = "🎯 No target found"
+            end
+        end
+    end)
+end
+
+local function stopAimlock()
+    if aimlockConn then
+        aimlockConn:Disconnect()
+        aimlockConn = nil
+    end
+    if targetLabel then
+        targetLabel.Text = ""
+    end
+end
+
+-- ========================
+-- AUTO-ATTACK SYSTEM
+-- ========================
+local autoAttackEnabled = false
+local autoAttackConn = nil
+local MAX_DISTANCE = 15
+local SPAM_DELAY = 0.1
+local lastClickTime = 0
+
+local function getNearestEnemyForAttack()
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+
+    local myHRP = character.HumanoidRootPart
+    local nearestEnemy = nil
+    local shortestDistance = MAX_DISTANCE
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then
+            local isEnemy = true
+            if player.Team and p.Team and player.Team == p.Team then
+                isEnemy = false
+            end
+
+            if isEnemy and p.Character then
+                local enemyHRP = p.Character:FindFirstChild("HumanoidRootPart")
+                local enemyHum = p.Character:FindFirstChildOfClass("Humanoid")
+
+                if enemyHRP and enemyHum and enemyHum.Health > 0 then
+                    local dist = (myHRP.Position - enemyHRP.Position).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        nearestEnemy = p
+                    end
+                end
+            end
+        end
+    end
+
+    return nearestEnemy
+end
+
+local function toggleAutoAttack(enable)
+    autoAttackEnabled = enable
+    if enable then
+        autoAttackConn = RunService.Heartbeat:Connect(function()
+            if not autoAttackEnabled then return end
+            local enemy = getNearestEnemyForAttack()
+            if enemy then
+                local currentTime = os.clock()
+                if currentTime - lastClickTime >= SPAM_DELAY then
+                    lastClickTime = currentTime
+                    
+                    -- Use VirtualInputManager for Studio compatibility
+                    local vim = game:GetService("VirtualInputManager")
+                    local mouse = player:GetMouse()
+                    vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 0)
+                    task.wait(0.01)
+                    vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 0)
+                end
+            end
+        end)
+        print("[Admin] Auto-Attack Enabled")
+    else
+        if autoAttackConn then
+            autoAttackConn:Disconnect()
+            autoAttackConn = nil
+        end
+        print("[Admin] Auto-Attack Disabled")
+    end
+end
+
+-- ========================
+-- AUTO BED BREAKER SYSTEM
+-- ========================
+local autoBedEnabled = false
+local autoBedConn = nil
+local BED_BREAK_RANGE = 15 -- studs
+local BED_CHECK_DELAY = 0.2 -- seconds between checks
+
+local function findNearestEnemyBed()
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = char.HumanoidRootPart.Position
+    
+    local nearestBed = nil
+    local nearestDist = BED_BREAK_RANGE
+    
+    -- Search workspace for beds
+    for _, obj in pairs(workspace:GetDescendants()) do
+        -- Common bed part names in bed wars games
+        if obj:IsA("BasePart") and (
+            obj.Name:lower():find("bed") or 
+            obj.Parent and obj.Parent.Name:lower():find("bed")
+        ) then
+            -- Skip if it's your team's bed
+            local bedTeam = obj:FindFirstChild("TeamValue") or (obj.Parent and obj.Parent:FindFirstChild("TeamValue"))
+            if bedTeam and bedTeam.Value == player.Team then
+                continue
+            end
+            
+            -- Check distance
+            local dist = (myPos - obj.Position).Magnitude
+            if dist < nearestDist then
+                nearestDist = dist
+                nearestBed = obj
+            end
+        end
+    end
+    
+    return nearestBed, nearestDist
+end
+
+local function toggleAutoBed(enable)
+    autoBedEnabled = enable
+    if enable then
+        autoBedConn = RunService.Heartbeat:Connect(function()
+            if not autoBedEnabled then return end
+            
+            local bed, distance = findNearestEnemyBed()
+            
+            if bed then
+                -- Face the bed
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local hrp = char.HumanoidRootPart
+                    local bedPos = bed.Position
+                    
+                    -- Look at bed
+                    local lookCFrame = CFrame.new(hrp.Position, Vector3.new(bedPos.X, hrp.Position.Y, bedPos.Z))
+                    hrp.CFrame = lookCFrame
+                    
+                    -- Point camera at bed
+                    camera.CFrame = CFrame.new(camera.CFrame.Position, bedPos)
+                    
+                    -- Click to break
+                    local vim = game:GetService("VirtualInputManager")
+                    local screenPos = camera:WorldToScreenPoint(bedPos)
+                    vim:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, true, game, 0)
+                    task.wait(0.05)
+                    vim:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, false, game, 0)
+                    
+                    print("[Auto Bed] Breaking bed at " .. math.floor(distance) .. " studs")
+                end
+                
+                task.wait(BED_CHECK_DELAY)
+            end
+        end)
+        print("[Admin] Auto Bed Breaker Enabled")
+    else
+        if autoBedConn then
+            autoBedConn:Disconnect()
+            autoBedConn = nil
+        end
+        print("[Admin] Auto Bed Breaker Disabled")
+    end
+end
+
+-- ========================
+-- TIME REWIND SYSTEM
+-- ========================
+local rewindEnabled = false
+local rewindConn = nil
+local positionHistory = {}
+local MAX_HISTORY_TIME = 3
+local REWIND_KEY = Enum.KeyCode.X
+
+local function toggleRewind(enable)
+    rewindEnabled = enable
+    if enable then
+        positionHistory = {}
+        
+        rewindConn = RunService.Heartbeat:Connect(function()
+            if not rewindEnabled then return end
+            
+            local char = player.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                
+                if hrp then
+                    table.insert(positionHistory, {
+                        position = hrp.CFrame,
+                        time = tick()
+                    })
+                    
+                    local currentTime = tick()
+                    while #positionHistory > 0 and (currentTime - positionHistory[1].time) > MAX_HISTORY_TIME do
+                        table.remove(positionHistory, 1)
+                    end
+                end
+            end
+        end)
+        
+        print("[Admin] Time Rewind Enabled - Press X to rewind 3 seconds")
+    else
+        if rewindConn then
+            rewindConn:Disconnect()
+            rewindConn = nil
+        end
+        positionHistory = {}
+        print("[Admin] Time Rewind Disabled")
+    end
+end
+
+local function rewindPosition()
+    if not rewindEnabled then 
+        print("[Admin] Time Rewind is not enabled!")
+        return 
+    end
+    
+    if #positionHistory == 0 then
+        print("[Admin] No position history available!")
+        return
+    end
+    
+    local char = player.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChild("Humanoid")
+        
+        if hrp and humanoid and humanoid.Health > 0 then
+            local oldestPos = positionHistory[1]
+            
+            -- Reset all physics
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            
+            -- Change to physics state to reset fall distance
+            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+            task.wait(0.05)
+            
+            -- Teleport to old position
+            hrp.CFrame = oldestPos.position
+            
+            -- Return to normal state
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+            task.wait(0.05)
+            humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            
+            -- Extra safety: trigger FloorMaterial to reset fall tracking
+            humanoid.FloorMaterial = Enum.Material.Plastic
+            
+            print("[Admin] Rewound 3 seconds!")
+        end
+    end
+end
+
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == REWIND_KEY then
+        rewindPosition()
+    end
+end)
+
+-- ========================
+-- BUTTON DEFINITIONS & CREATION
+-- ========================
+local btns = {
+    { name = "👁 ESP Players [OFF]",     color = Color3.fromRGB(0, 170, 255),   isESP = true },
+    { name = "🎯 Aimlock [HOLD]",        color = Color3.fromRGB(255, 60, 120),  isAimlock = true },
+    { name = "⚔ Auto-Attack [OFF]",     color = Color3.fromRGB(50, 180, 90),   isAutoAttack = true },
+    { name = "⏪ Time Rewind [OFF]",    color = Color3.fromRGB(100, 200, 255), isRewind = true },
+    { name = "🛏️ Auto Bed Break [OFF]", color = Color3.fromRGB(200, 100, 255), isAutoBed = true },
+}
+
+for i, data in btns do
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, 0, 0, 42)
+    b.BackgroundColor3 = data.color
+    b.BorderSizePixel = 0
+    b.Text = data.name
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.TextSize = 15
+    b.Font = Enum.Font.GothamSemibold
+    b.LayoutOrder = i
+    b.Parent = container
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
+
+    b.MouseEnter:Connect(function()
+        b.BackgroundColor3 = data.color:Lerp(Color3.new(1, 1, 1), 0.15)
+    end)
+    
+        b.MouseLeave:Connect(function()
+        if data.isESP and espEnabled then
+            b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+        elseif data.isAimlock and aimlockHolding then
+            b.BackgroundColor3 = Color3.fromRGB(255, 30, 80)
+        elseif data.isAutoAttack and autoAttackEnabled then
+            b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+        elseif data.isRewind and rewindEnabled then
+            b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+        elseif data.isAutoBed and autoBedEnabled then
+            b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+        else
+            b.BackgroundColor3 = data.color
+        end
+    end)
+
+    if data.isESP then
+        b.MouseButton1Click:Connect(function()
+            espEnabled = not espEnabled
+            if espEnabled then
+                b.Text = "👁 ESP Players [ON]"
+                b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+                data.color = Color3.fromRGB(0, 200, 80)
+                enableESP()
+            else
+                b.Text = "👁 ESP Players [OFF]"
+                b.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+                data.color = Color3.fromRGB(0, 170, 255)
+                disableESP()
+            end
+        end)
+        
+    elseif data.isAimlock then
+        b.MouseButton1Down:Connect(function()
+            aimlockHolding = true
+            b.Text = "🎯 Aimlock [ACTIVE]"
+            b.BackgroundColor3 = Color3.fromRGB(255, 30, 80)
+            data.color = Color3.fromRGB(255, 30, 80)
+            startAimlock()
+        end)
+
+        b.MouseButton1Up:Connect(function()
+            aimlockHolding = false
+            b.Text = "🎯 Aimlock [HOLD]"
+            b.BackgroundColor3 = Color3.fromRGB(255, 60, 120)
+            data.color = Color3.fromRGB(255, 60, 120)
+            stopAimlock()
+        end)
+
+    elseif data.isAutoAttack then
+        b.MouseButton1Click:Connect(function()
+            autoAttackEnabled = not autoAttackEnabled
+            if autoAttackEnabled then
+                b.Text = "⚔ Auto-Attack [ON]"
+                b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+                data.color = Color3.fromRGB(0, 200, 80)
+                toggleAutoAttack(true)
+            else
+                b.Text = "⚔ Auto-Attack [OFF]"
+                b.BackgroundColor3 = Color3.fromRGB(50, 180, 90)
+                data.color = Color3.fromRGB(50, 180, 90)
+                toggleAutoAttack(false)
+            end
+        end)
+        
+    elseif data.isRewind then
+        b.MouseButton1Click:Connect(function()
+            rewindEnabled = not rewindEnabled
+            if rewindEnabled then
+                b.Text = "⏪ Time Rewind [ON]"
+                b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+                data.color = Color3.fromRGB(0, 200, 80)
+                toggleRewind(true)
+            else
+                b.Text = "⏪ Time Rewind [OFF]"
+                b.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+                data.color = Color3.fromRGB(100, 200, 255)
+                toggleRewind(false)
+            end
+        end)
+
+            elseif data.isAutoBed then
+        b.MouseButton1Click:Connect(function()
+            autoBedEnabled = not autoBedEnabled
+            if autoBedEnabled then
+                b.Text = "🛏️ Auto Bed Break [ON]"
+                b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+                data.color = Color3.fromRGB(0, 200, 80)
+                toggleAutoBed(true)
+            else
+                b.Text = "🛏️ Auto Bed Break [OFF]"
+                b.BackgroundColor3 = Color3.fromRGB(200, 100, 255)
+                data.color = Color3.fromRGB(200, 100, 255)
+                toggleAutoBed(false)
+            end
+        end)
+        
+    else
+        b.MouseButton1Click:Connect(function()
+            print("[Admin] " .. data.name .. " clicked")
+        end)
+    end
+end
+
+targetLabel = Instance.new("TextLabel")
+targetLabel.Size = UDim2.new(1, 0, 0, 20)
+targetLabel.BackgroundTransparency = 1
+targetLabel.Text = ""
+targetLabel.TextColor3 = Color3.fromRGB(255, 80, 130)
+targetLabel.TextSize = 13
+targetLabel.Font = Enum.Font.GothamSemibold
+targetLabel.LayoutOrder = 99
+targetLabel.Parent = container
+
+-- ========================
+-- KEYBIND: Hold Q for aimlock
+-- ========================
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.Q then
+        aimlockHolding = true
+        startAimlock()
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Q then
+        aimlockHolding = false
+        stopAimlock()
+    end
+end)
+
+-- ========================
+-- KEYBIND: Toggle UI with Right Shift
+-- ========================
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        frame.Visible = not frame.Visible
+    end
+end)
+
+-- ========================
+-- DRAGGING
+-- ========================
+local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+print("[Admin] Panel loaded successfully.")
