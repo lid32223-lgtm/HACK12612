@@ -373,31 +373,63 @@ end
 -- ========================
 local autoBedEnabled = false
 local autoBedConn = nil
-local BED_BREAK_RANGE = 15 -- studs
-local BED_CHECK_DELAY = 0.2 -- seconds between checks
+local BED_BREAK_RANGE = 15
+local BED_CHECK_DELAY = 0.2
+local BED_TOGGLE_KEY = Enum.KeyCode.Z
+local autoBedButton = nil
+local autoBedButtonData = nil
+
+local function isOwnBed(bedPart)
+    if not player.Team then return false end
+    local myTeamName = player.Team.Name:lower()
+    local myColor = player.Team.TeamColor
+
+    local cur = bedPart
+    for i = 1, 4 do
+        if not cur or cur == workspace then break end
+
+        if cur.Name:lower():find(myTeamName, 1, true) then
+            return true
+        end
+
+        for _, n in { "Team", "TeamValue", "Owner", "TeamColor", "BedTeam" } do
+            local v = cur:FindFirstChild(n)
+            if v then
+                if v:IsA("StringValue") and v.Value:lower() == myTeamName then return true end
+                if v:IsA("ObjectValue") and v.Value == player.Team then return true end
+                if v:IsA("BrickColorValue") and v.Value == myColor then return true end
+            end
+        end
+
+        local attr = cur:GetAttribute("Team") or cur:GetAttribute("TeamName") or cur:GetAttribute("Owner")
+        if type(attr) == "string" and attr:lower() == myTeamName then
+            return true
+        end
+
+        if cur:IsA("BasePart") and myColor and cur.BrickColor == myColor then
+            return true
+        end
+
+        cur = cur.Parent
+    end
+    return false
+end
 
 local function findNearestEnemyBed()
     local char = player.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
     local myPos = char.HumanoidRootPart.Position
-    
+
     local nearestBed = nil
     local nearestDist = BED_BREAK_RANGE
-    
-    -- Search workspace for beds
+
     for _, obj in pairs(workspace:GetDescendants()) do
-        -- Common bed part names in bed wars games
         if obj:IsA("BasePart") and (
-            obj.Name:lower():find("bed") or 
-            obj.Parent and obj.Parent.Name:lower():find("bed")
+            obj.Name:lower():find("bed") or
+            (obj.Parent and obj.Parent.Name:lower():find("bed"))
         ) then
-            -- Skip if it's your team's bed
-            local bedTeam = obj:FindFirstChild("TeamValue") or (obj.Parent and obj.Parent:FindFirstChild("TeamValue"))
-            if bedTeam and bedTeam.Value == player.Team then
-                continue
-            end
-            
-            -- Check distance
+            if isOwnBed(obj) then continue end
+
             local dist = (myPos - obj.Position).Magnitude
             if dist < nearestDist then
                 nearestDist = dist
@@ -405,51 +437,49 @@ local function findNearestEnemyBed()
             end
         end
     end
-    
+
     return nearestBed, nearestDist
+end
+
+local function updateAutoBedButton()
+    if not autoBedButton then return end
+    if autoBedEnabled then
+        autoBedButton.Text = "🛏️ Auto Bed Break [ON] (B)"
+        autoBedButton.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+        autoBedButtonData.color = Color3.fromRGB(0, 200, 80)
+    else
+        autoBedButton.Text = "🛏️ Auto Bed Break [OFF] (B)"
+        autoBedButton.BackgroundColor3 = Color3.fromRGB(200, 100, 255)
+        autoBedButtonData.color = Color3.fromRGB(200, 100, 255)
+    end
 end
 
 local function toggleAutoBed(enable)
     autoBedEnabled = enable
+    updateAutoBedButton()
     if enable then
-        autoBedConn = RunService.Heartbeat:Connect(function()
-            if not autoBedEnabled then return end
-            
-            local bed, distance = findNearestEnemyBed()
-            
-            if bed then
-                -- Face the bed
-                local char = player.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    local hrp = char.HumanoidRootPart
-                    local bedPos = bed.Position
-                    
-                    -- Look at bed
-                    local lookCFrame = CFrame.new(hrp.Position, Vector3.new(bedPos.X, hrp.Position.Y, bedPos.Z))
-                    hrp.CFrame = lookCFrame
-                    
-                    -- Point camera at bed
-                    camera.CFrame = CFrame.new(camera.CFrame.Position, bedPos)
-                    
-                    -- Click to break
-                    local vim = game:GetService("VirtualInputManager")
-                    local screenPos = camera:WorldToScreenPoint(bedPos)
-                    vim:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, true, game, 0)
-                    task.wait(0.05)
-                    vim:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, false, game, 0)
-                    
-                    print("[Auto Bed] Breaking bed at " .. math.floor(distance) .. " studs")
+        if autoBedConn then task.cancel(autoBedConn) end
+        autoBedConn = task.spawn(function()
+            local vim = game:GetService("VirtualInputManager")
+            while autoBedEnabled do
+                local bed, distance = findNearestEnemyBed()
+                if bed then
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(bed.Position.X, hrp.Position.Y, bed.Position.Z))
+                        camera.CFrame = CFrame.new(camera.CFrame.Position, bed.Position)
+                        local screenPos = camera:WorldToScreenPoint(bed.Position)
+                        vim:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, true, game, 0)
+                        task.wait(0.05)
+                        vim:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, false, game, 0)
+                    end
                 end
-                
                 task.wait(BED_CHECK_DELAY)
             end
         end)
         print("[Admin] Auto Bed Breaker Enabled")
     else
-        if autoBedConn then
-            autoBedConn:Disconnect()
-            autoBedConn = nil
-        end
         print("[Admin] Auto Bed Breaker Disabled")
     end
 end
@@ -572,6 +602,11 @@ for i, data in btns do
     b.Font = Enum.Font.GothamSemibold
     b.LayoutOrder = i
     b.Parent = container
+
+    if data.isAutoBed then
+        autoBedButton = b
+        autoBedButtonData = data
+    end
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
 
     b.MouseEnter:Connect(function()
@@ -661,18 +696,7 @@ for i, data in btns do
 
             elseif data.isAutoBed then
         b.MouseButton1Click:Connect(function()
-            autoBedEnabled = not autoBedEnabled
-            if autoBedEnabled then
-                b.Text = "🛏️ Auto Bed Break [ON]"
-                b.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
-                data.color = Color3.fromRGB(0, 200, 80)
-                toggleAutoBed(true)
-            else
-                b.Text = "🛏️ Auto Bed Break [OFF]"
-                b.BackgroundColor3 = Color3.fromRGB(200, 100, 255)
-                data.color = Color3.fromRGB(200, 100, 255)
-                toggleAutoBed(false)
-            end
+            toggleAutoBed(not autoBedEnabled)
         end)
         
     else
@@ -751,6 +775,13 @@ UIS.InputChanged:Connect(function(input)
             startPos.X.Scale, startPos.X.Offset + delta.X,
             startPos.Y.Scale, startPos.Y.Offset + delta.Y
         )
+    end
+end)
+
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == BED_TOGGLE_KEY then
+        toggleAutoBed(not autoBedEnabled)
     end
 end)
 
