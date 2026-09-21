@@ -374,7 +374,7 @@ end
 local autoBedEnabled = false
 local autoBedConn = nil
 local BED_BREAK_RANGE = 15
-local BED_CHECK_DELAY = 0.2
+local BED_CHECK_DELAY = 0.02
 local BED_TOGGLE_KEY = Enum.KeyCode.Z
 local autoBedButton = nil
 local autoBedButtonData = nil
