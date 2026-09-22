@@ -66,15 +66,24 @@ Instance.new("UIListLayout", container).Padding = UDim.new(0, 8)
 local espEnabled = false
 local espConnections = {}
 
+local teamColorOverrides = {
+  Red = Color3.fromRGB(255, 50, 50),
+  Blue = Color3.fromRGB(50, 150, 255),
+  Green = Color3.fromRGB(50, 255, 50),
+  Yellow = Color3.fromRGB(255, 230, 50),
+  Orange = Color3.fromRGB(255, 140, 20),
+  Purple = Color3.fromRGB(180, 80, 255),
+  Pink = Color3.fromRGB(255, 80, 200),
+  Cyan = Color3.fromRGB(50, 255, 255),
+  White = Color3.fromRGB(240, 240, 240),
+  Black = Color3.fromRGB(80, 80, 80),
+}
+
 local function getTeamColor(targetPlayer)
-    if targetPlayer.Team and player.Team then
-        if targetPlayer.Team == player.Team then
-            return Color3.fromRGB(50, 255, 50)
-        else
-            return Color3.fromRGB(255, 50, 50)
-        end
-    end
-    return Color3.fromRGB(255, 255, 0)
+  if targetPlayer.Team and targetPlayer.Team.TeamColor then
+    return targetPlayer.Team.TeamColor.Color
+  end
+  return Color3.fromRGB(255, 255, 0) -- neutral / no team
 end
 
 local function addESP(targetPlayer)
@@ -201,6 +210,19 @@ local function enableESP()
                 end
             end
         end
+        local h = p.Character:FindFirstChild("AdminESP")
+if h then
+  local c = getTeamColor(p)
+  h.FillColor = c
+  h.OutlineColor = c
+  if head then
+    local tag = head:FindFirstChild("AdminESPTag")
+    if tag then
+      local nameLabel = tag:FindFirstChildOfClass("TextLabel")
+      if nameLabel then nameLabel.TextColor3 = c end
+    end
+  end
+end
     end)
     table.insert(espConnections, distConn)
 end
@@ -717,18 +739,18 @@ targetLabel.LayoutOrder = 99
 targetLabel.Parent = container
 
 -- ========================
--- KEYBIND: Hold Q for aimlock
+-- KEYBIND: Hold V for aimlock
 -- ========================
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
-    if input.KeyCode == Enum.KeyCode.Q then
+    if input.KeyCode == Enum.KeyCode.V then
         aimlockHolding = true
         startAimlock()
     end
 end)
 
 UIS.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Q then
+    if input.KeyCode == Enum.KeyCode.V then
         aimlockHolding = false
         stopAimlock()
     end
